@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spinn-neuroseer"
+version = "3.0.0"
+description = "SPINN NeuroSeer robot brain core with ISO 13482 safety layer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "LicenseRef-Research-Eval"
+license-files = ["LICENSE-RESEARCH.md", "LICENSE-COMMERCIAL-TEMPLATE.md"]
+authors = [
+  { name = "Transcendental Gateways" }
+]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "scikit-learn>=1.3"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering"
+]
+
+[project.urls]
+Homepage = "https://github.com/Transcendental-Gateways/sign-of-the-times777"
+Repository = "https://github.com/Transcendental-Gateways/sign-of-the-times777"
+Documentation = "https://github.com/Transcendental-Gateways/sign-of-the-times777/blob/main/README.md"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.2",
+  "twine>=5.1.0"
+]
+hardware-serial = [
+  "pyserial>=3.5"
+]
+
+[tool.setuptools]
+py-modules = ["SPINN_RobotBrain", "lorenz_kalman", "safety_layer", "hardware_abstraction"]

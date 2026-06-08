@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPINN Robot Brain</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #0f0;
+        }
+
+        .health-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            background: #020402;
+            border: 2px solid #0f0;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+
+        .health-title {
+            color: #0ff;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .health-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 13px;
+        }
+
+        .health-item {
+            padding: 4px 8px;
+            border: 1px solid #0f0;
+            border-radius: 3px;
+            background: #000;
+        }
+
+        .health-item.warn {
+            border-color: #ff0;
+            color: #ff0;
+        }
+
+        .health-item.crit {
+            border-color: #f00;
+            color: #f00;
+        }
+
+        .indicator-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            background: #030503;
+            border: 2px solid #0ff;
+            padding: 10px 16px;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+        }
+
+        .indicator-title {
+            color: #0ff;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .indicator-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 13px;
+        }
+
+        .indicator-item {
+            padding: 4px 8px;
+            border: 1px solid #0ff;
+            border-radius: 3px;
+            background: #000;
+        }
+
+        .indicator-item.warn {
+            border-color: #ff0;
+            color: #ff0;
+        }
+
+        .indicator-item.crit {
+            border-color: #f00;
+            color: #f00;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: #111;
+            border: 2px solid #0f0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #0ff;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #0ff;
+            box-shadow: 0 0 10px #0ff;
+        }
+        
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat {
+            background: #000;
+            padding: 10px;
+            border: 1px solid #0f0;
+            border-radius: 3px;
+        }
+        
+        .stat-label {
+            color: #0ff;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .world {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sensor-bars {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .sensor-bar {
+            flex: 1;
+            height: 150px;
+            background: #000;
+            border: 1px solid #0f0;
+            position: relative;
+            border-radius: 3px;
+        }
+        
+        .sensor-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, #0f0, #0ff);
+            transition: height 0.3s;
+        }
+        
+        .sensor-label {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #0ff;
+        }
+        
+        .sensor-value {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .log {
+            background: #000;
+            border: 1px solid #0f0;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+        
+        .manual-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .slider-control {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            accent-color: #0f0;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 SPINN ROBOT BRAIN 🧠</h1>
+
+        <div class="health-strip">
+            <div class="health-title">SYSTEM HEALTH SUMMARY</div>
+            <div class="health-items">
+                <div class="health-item" id="healthLoop">Loop: 0.00 Hz</div>
+                <div class="health-item" id="healthThroughput">Throughput: 0.00 /s</div>
+                <div class="health-item" id="healthSafety">Safety: UNKNOWN</div>
+                <div class="health-item" id="healthKalman">Kalman: UNSTABLE</div>
+                <div class="health-item" id="healthEstop">E-Stop: -</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="initRobot()">Initialize Brain</button>
+            <button id="startBtn" onclick="startRobot()" disabled>Start Autonomous</button>
+            <button id="stopBtn" onclick="stopRobot()" disabled>Stop</button>
+            <button id="resetBtn" onclick="resetRobot()" disabled>Reset Position</button>
+        </div>
+        
+        <div class="grid">
+            <!-- World View -->
+            <div class="panel full-width">
+                <h2>World View</h2>
+                <div class="world">
+                    <canvas id="worldCanvas" width="800" height="400"></canvas>
+                </div>
+            </div>
+            
+            <!-- Status Panel -->
+            <div class="panel">
+                <h2>Brain Status</h2>
+                <div class="status-grid">
+                    <div class="stat">
+                        <div class="stat-label">STATE</div>
+                        <div class="stat-value" id="stateValue">OFFLINE</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">BEHAVIOR</div>
+                        <div class="stat-value" id="behaviorValue">-</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">FIELD COHERENCE</div>
+                        <div class="stat-value" id="coherenceValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">MORPHOGENIC PHASE</div>
+                        <div class="stat-value" id="phaseValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">POSITION X</div>
+                        <div class="stat-value" id="posXValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">POSITION Y</div>
+                        <div class="stat-value" id="posYValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">ORIENTATION</div>
+                        <div class="stat-value" id="orientValue">0°</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">DECISIONS</div>
+                        <div class="stat-value" id="decisionsValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LOOP FREQ</div>
+                        <div class="stat-value" id="loopFreqValue">0.00 Hz</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">THROUGHPUT</div>
+                        <div class="stat-value" id="throughputValue">0.00 /s</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SNN Metrics Panel -->
+            <div class="panel">
+                <h2>SNN Metrics</h2>
+                <div class="status-grid">
+                    <div class="stat">
+                        <div class="stat-label">SYNAPTIC TRACE L</div>
+                        <div class="stat-value" id="traceLeftValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">SYNAPTIC TRACE F</div>
+                        <div class="stat-value" id="traceFrontValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">SYNAPTIC TRACE R</div>
+                        <div class="stat-value" id="traceRightValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LORENZ X</div>
+                        <div class="stat-value" id="lorenzXValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LORENZ Y</div>
+                        <div class="stat-value" id="lorenzYValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LORENZ Z</div>
+                        <div class="stat-value" id="lorenzZValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">FIELD ENERGY</div>
+                        <div class="stat-value" id="fieldEnergyValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">THREAT LEVEL</div>
+                        <div class="stat-value" id="threatValue">0.00</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Safety Metrics Panel -->
+            <div class="panel">
+                <h2>Safety Status</h2>
+                <div class="status-grid">
+                    <div class="stat">
+                        <div class="stat-label">SAFETY LEVEL</div>
+                        <div class="stat-value" id="safetyLevelValue">NOMINAL</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">MOTOR LEFT</div>
+                        <div class="stat-value" id="motorLeftValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">MOTOR RIGHT</div>
+                        <div class="stat-value" id="motorRightValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">VELOCITY</div>
+                        <div class="stat-value" id="velocityValue">0.00 m/s</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">MIN OBSTACLE</div>
+                        <div class="stat-value" id="minObstacleValue">∞</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">WATCHDOG</div>
+                        <div class="stat-value" id="watchdogValue">OK</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">E-STOP</div>
+                        <div class="stat-value" id="estopValue">CLEAR</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">FAILURES</div>
+                        <div class="stat-value" id="failuresValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">TRANSITIONS</div>
+                        <div class="stat-value" id="safetyTransitionsValue">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LAST TRANSITION</div>
+                        <div class="stat-value" id="safetyLastTransitionValue">-</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">E-STOP RESPONSE</div>
+                        <div class="stat-value" id="estopResponseValue">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kalman Filter Panel -->
+            <div class="panel">
+                <h2>SNN-Optimized Lorenz Kalman Filter</h2>
+                <div class="status-grid">
+                    <div class="stat">
+                        <div class="stat-label">EST POS X</div>
+                        <div class="stat-value" id="kalmanPosXValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">EST POS Y</div>
+                        <div class="stat-value" id="kalmanPosYValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">EST VEL X</div>
+                        <div class="stat-value" id="kalmanVelXValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">EST VEL Y</div>
+                        <div class="stat-value" id="kalmanVelYValue">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">POS UNCERTAINTY</div>
+                        <div class="stat-value" id="kalmanPosUncValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">VEL UNCERTAINTY</div>
+                        <div class="stat-value" id="kalmanVelUncValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">SPIKE TRACE</div>
+                        <div class="stat-value" id="spikeTraceValue">0.000</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">LORENZ RHO</div>
+                        <div class="stat-value" id="lorenzRhoValue">28.0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">STABILIZATION</div>
+                        <div class="stat-value" id="stabilizationValue">OFF</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">CHAOS→ORDER</div>
+                        <div class="stat-value" id="chaosOrderValue">1.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">STABILITY</div>
+                        <div class="stat-value" id="kalmanStabilityValue">0.00</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sensors -->
+            <div class="panel">
+                <h2>Distance Sensors</h2>
+                <div class="sensor-bars">
+                    <div class="sensor-bar">
+                        <div class="sensor-label">LEFT</div>
+                        <div class="sensor-fill" id="sensorLeft"></div>
+                        <div class="sensor-value" id="sensorLeftVal">0</div>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-label">FRONT</div>
+                        <div class="sensor-fill" id="sensorFront"></div>
+                        <div class="sensor-value" id="sensorFrontVal">0</div>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-label">RIGHT</div>
+                        <div class="sensor-fill" id="sensorRight"></div>
+                        <div class="sensor-value" id="sensorRightVal">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Log -->
+            <div class="panel full-width">
+                <h2>System Log</h2>
+                <div class="log" id="systemLog"></div>
+            </div>
+        </div>
+
+        <div class="indicator-strip">
+            <div class="indicator-title">DERIVED INDICATORS</div>
+            <div class="indicator-items">
+                <div class="indicator-item" id="perfIndicator">Performance: 0</div>
+                <div class="indicator-item" id="safetyIndicator">Safety Index: 0</div>
+                <div class="indicator-item" id="estimationIndicator">Estimation: 0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let updateInterval = null;
+        let initialized = false;
+        
+        function log(message) {
+            const logDiv = document.getElementById('systemLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function initRobot() {
+            try {
+                log('Initializing robot brain...');
+                const response = await fetch('/api/robot/init', { method: 'POST' });
+                const data = await response.json();
+                if (data.message) {
+                    log('✓ ' + data.message);
+                }
+                initialized = true;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('resetBtn').disabled = false;
+            } catch (error) {
+                log('✗ Initialization failed: ' + error.message);
+            }
+        }
+        
+        async function startRobot() {
+            try {
+                log('Starting autonomous mode...');
+                const response = await fetch('/api/robot/start', { method: 'POST' });
+                const data = await response.json();
+                if (data.message) {
+                    log('✓ ' + data.message);
+                }
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                startUpdates();
+            } catch (error) {
+                log('✗ Start failed: ' + error.message);
+            }
+        }
+        
+        async function stopRobot() {
+            try {
+                log('Stopping robot...');
+                const response = await fetch('/api/robot/stop', { method: 'POST' });
+                const data = await response.json();
+                if (data.message) {
+                    log('✓ ' + data.message);
+                }
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                stopUpdates();
+            } catch (error) {
+                log('✗ Stop failed: ' + error.message);
+            }
+        }
+        
+        async function resetRobot() {
+            try {
+                log('Resetting robot position...');
+                const response = await fetch('/api/robot/reset', { method: 'POST' });
+                const data = await response.json();
+                if (data.message) {
+                    log('✓ ' + data.message);
+                }
+            } catch (error) {
+                log('✗ Reset failed: ' + error.message);
+            }
+        }
+        
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/robot/status');
+                const data = await response.json();
+                
+                // Update brain status
+                document.getElementById('stateValue').textContent = data.active ? 'ACTIVE' : 'IDLE';
+                document.getElementById('behaviorValue').textContent = data.brain.behavior.toUpperCase();
+                document.getElementById('coherenceValue').textContent = data.brain.field_coherence.toFixed(2);
+                document.getElementById('phaseValue').textContent = data.brain.morphogenic_phase.toFixed(3);
+                document.getElementById('decisionsValue').textContent = data.brain.decisions_queued;
+                document.getElementById('loopFreqValue').textContent = (data.brain.loop_frequency_hz || 0).toFixed(2) + ' Hz';
+                document.getElementById('throughputValue').textContent = (data.brain.throughput_rate || 0).toFixed(2) + ' /s';
+
+                // System health summary
+                const loopHz = data.brain.loop_frequency_hz || 0;
+                const throughput = data.brain.throughput_rate || 0;
+                const safetyLevel = data.safety_metrics?.safety_level || 'UNKNOWN';
+                const watchdogOk = data.safety_metrics?.watchdog_ok;
+                const estopMs = data.safety_metrics?.estop_response_ms;
+                const stabilityScore = data.kalman_metrics?.stability_score || 0;
+
+                const healthLoop = document.getElementById('healthLoop');
+                const healthThroughput = document.getElementById('healthThroughput');
+                const healthSafety = document.getElementById('healthSafety');
+                const healthKalman = document.getElementById('healthKalman');
+                const healthEstop = document.getElementById('healthEstop');
+
+                healthLoop.textContent = `Loop: ${loopHz.toFixed(2)} Hz`;
+                healthThroughput.textContent = `Throughput: ${throughput.toFixed(2)} /s`;
+                healthSafety.textContent = `Safety: ${safetyLevel}`;
+                healthKalman.textContent = `Kalman: ${stabilityScore >= 0.5 ? 'STABLE' : 'UNSTABLE'}`;
+                healthEstop.textContent = `E-Stop: ${estopMs !== null && estopMs !== undefined ? estopMs.toFixed(2) + ' ms' : '-'}`;
+
+                healthLoop.classList.toggle('warn', loopHz > 0 && loopHz < 5);
+                healthLoop.classList.toggle('crit', loopHz === 0);
+                healthThroughput.classList.toggle('warn', throughput > 0 && throughput < 2);
+                healthThroughput.classList.toggle('crit', throughput === 0);
+                const safetyWarn = ['CAUTION', 'WARNING'].includes(safetyLevel);
+                const safetyCrit = ['CRITICAL', 'EMERGENCY'].includes(safetyLevel) || watchdogOk === false;
+                healthSafety.classList.toggle('warn', safetyWarn);
+                healthSafety.classList.toggle('crit', safetyCrit);
+                healthKalman.classList.toggle('warn', stabilityScore > 0 && stabilityScore < 0.5);
+                healthKalman.classList.toggle('crit', stabilityScore === 0);
+                healthEstop.classList.toggle('warn', estopMs !== null && estopMs !== undefined && estopMs > 100);
+
+                // Derived indicators
+                const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+                const perfIndex = clamp(((loopHz / 10) * 0.6 + (throughput / 10) * 0.4) * 100, 0, 100);
+                const safetyIndexBase = safetyCrit ? 10 : safetyWarn ? 50 : 90;
+                const safetyIndex = clamp(safetyIndexBase - (watchdogOk === false ? 20 : 0), 0, 100);
+                const estimationIndex = clamp(stabilityScore * 100, 0, 100);
+
+                const perfIndicator = document.getElementById('perfIndicator');
+                const safetyIndicator = document.getElementById('safetyIndicator');
+                const estimationIndicator = document.getElementById('estimationIndicator');
+
+                perfIndicator.textContent = `Performance: ${perfIndex.toFixed(0)}`;
+                safetyIndicator.textContent = `Safety Index: ${safetyIndex.toFixed(0)}`;
+                estimationIndicator.textContent = `Estimation: ${estimationIndex.toFixed(0)}`;
+
+                perfIndicator.classList.toggle('warn', perfIndex > 0 && perfIndex < 50);
+                perfIndicator.classList.toggle('crit', perfIndex === 0);
+                safetyIndicator.classList.toggle('warn', safetyIndex > 0 && safetyIndex < 60);
+                safetyIndicator.classList.toggle('crit', safetyIndex === 0 || safetyCrit);
+                estimationIndicator.classList.toggle('warn', estimationIndex > 0 && estimationIndex < 50);
+                estimationIndicator.classList.toggle('crit', estimationIndex === 0);
+                
+                // Update position
+                document.getElementById('posXValue').textContent = data.position.x.toFixed(2);
+                document.getElementById('posYValue').textContent = data.position.y.toFixed(2);
+                document.getElementById('orientValue').textContent = data.position.orientation.toFixed(1) + '°';
+                
+                // Update SNN metrics
+                if (data.snn_metrics) {
+                    if (data.snn_metrics.synaptic_traces) {
+                        document.getElementById('traceLeftValue').textContent = data.snn_metrics.synaptic_traces[0]?.toFixed(3) || '0.000';
+                        document.getElementById('traceFrontValue').textContent = data.snn_metrics.synaptic_traces[1]?.toFixed(3) || '0.000';
+                        document.getElementById('traceRightValue').textContent = data.snn_metrics.synaptic_traces[2]?.toFixed(3) || '0.000';
+                    }
+                    if (data.snn_metrics.lorenz_state) {
+                        document.getElementById('lorenzXValue').textContent = data.snn_metrics.lorenz_state[0]?.toFixed(2) || '0.00';
+                        document.getElementById('lorenzYValue').textContent = data.snn_metrics.lorenz_state[1]?.toFixed(2) || '0.00';
+                        document.getElementById('lorenzZValue').textContent = data.snn_metrics.lorenz_state[2]?.toFixed(2) || '0.00';
+                    }
+                    document.getElementById('fieldEnergyValue').textContent = (data.snn_metrics.field_energy || 0).toFixed(2);
+                    document.getElementById('threatValue').textContent = (data.snn_metrics.threat_level || 0).toFixed(2);
+                }
+                
+                // Update safety metrics
+                if (data.safety_metrics) {
+                    document.getElementById('safetyLevelValue').textContent = data.safety_metrics.safety_level || 'NOMINAL';
+                    document.getElementById('motorLeftValue').textContent = (data.safety_metrics.motor_left || 0).toFixed(0);
+                    document.getElementById('motorRightValue').textContent = (data.safety_metrics.motor_right || 0).toFixed(0);
+                    document.getElementById('velocityValue').textContent = (data.safety_metrics.velocity || 0).toFixed(2) + ' m/s';
+                    const minObs = data.safety_metrics.min_obstacle;
+                    document.getElementById('minObstacleValue').textContent = minObs ? minObs.toFixed(2) + 'm' : '∞';
+                    document.getElementById('watchdogValue').textContent = data.safety_metrics.watchdog_ok ? 'OK' : 'TIMEOUT';
+                    document.getElementById('estopValue').textContent = data.safety_metrics.emergency_stop ? 'ENGAGED' : 'CLEAR';
+                    document.getElementById('failuresValue').textContent = data.safety_metrics.failure_count || 0;
+                    document.getElementById('safetyTransitionsValue').textContent = data.safety_metrics.safety_transitions || 0;
+
+                    const lastTransition = data.safety_metrics.last_transition;
+                    if (lastTransition && lastTransition.from && lastTransition.to) {
+                        document.getElementById('safetyLastTransitionValue').textContent = `${lastTransition.from}→${lastTransition.to}`;
+                    } else {
+                        document.getElementById('safetyLastTransitionValue').textContent = '-';
+                    }
+
+                    const estopResponse = data.safety_metrics.estop_response_ms;
+                    document.getElementById('estopResponseValue').textContent =
+                        (estopResponse !== null && estopResponse !== undefined)
+                            ? estopResponse.toFixed(2) + ' ms'
+                            : '-';
+                    
+                    // Color code safety level
+                    const safetyElem = document.getElementById('safetyLevelValue');
+                    if (data.safety_metrics.safety_level === 'EMERGENCY') {
+                        safetyElem.style.color = '#f00';
+                    } else if (data.safety_metrics.safety_level === 'WARNING') {
+                        safetyElem.style.color = '#ff0';
+                    } else if (data.safety_metrics.safety_level === 'CAUTION') {
+                        safetyElem.style.color = '#fa0';
+                    } else {
+                        safetyElem.style.color = '#0f0';
+                    }
+                }
+                
+                // Update Kalman filter metrics with SNN optimization
+                if (data.kalman_metrics) {
+                    document.getElementById('kalmanPosXValue').textContent = (data.kalman_metrics.estimated_pos_x || 0).toFixed(2);
+                    document.getElementById('kalmanPosYValue').textContent = (data.kalman_metrics.estimated_pos_y || 0).toFixed(2);
+                    document.getElementById('kalmanVelXValue').textContent = (data.kalman_metrics.estimated_vel_x || 0).toFixed(2);
+                    document.getElementById('kalmanVelYValue').textContent = (data.kalman_metrics.estimated_vel_y || 0).toFixed(2);
+                    document.getElementById('kalmanPosUncValue').textContent = (data.kalman_metrics.position_uncertainty || 0).toFixed(3);
+                    document.getElementById('kalmanVelUncValue').textContent = (data.kalman_metrics.velocity_uncertainty || 0).toFixed(3);
+                    
+                    // SNN optimization metrics
+                    document.getElementById('spikeTraceValue').textContent = (data.kalman_metrics.snn_spike_trace || 0).toFixed(3);
+                    document.getElementById('lorenzRhoValue').textContent = (data.kalman_metrics.snn_current_rho || 28).toFixed(1);
+                    
+                    const stabilizationElem = document.getElementById('stabilizationValue');
+                    const isStabilizing = data.kalman_metrics.snn_stabilization_active;
+                    stabilizationElem.textContent = isStabilizing ? 'ACTIVE' : 'OFF';
+                    stabilizationElem.style.color = isStabilizing ? '#0ff' : '#666';
+                    
+                    const chaosOrder = data.kalman_metrics.chaos_to_order_ratio || 1.0;
+                    document.getElementById('chaosOrderValue').textContent = chaosOrder.toFixed(2);
+
+                    const stabilityScore = data.kalman_metrics.stability_score || 0.0;
+                    document.getElementById('kalmanStabilityValue').textContent = stabilityScore.toFixed(2);
+                }
+                
+                // Update sensors
+                const maxDist = 15;
+                document.getElementById('sensorLeft').style.height = (data.sensors[0] / maxDist * 100) + '%';
+                document.getElementById('sensorFront').style.height = (data.sensors[1] / maxDist * 100) + '%';
+                document.getElementById('sensorRight').style.height = (data.sensors[2] / maxDist * 100) + '%';
+                document.getElementById('sensorLeftVal').textContent = data.sensors[0].toFixed(1);
+                document.getElementById('sensorFrontVal').textContent = data.sensors[1].toFixed(1);
+                document.getElementById('sensorRightVal').textContent = data.sensors[2].toFixed(1);
+                
+                // Draw world
+                drawWorld(data.position, data.sensors);
+                
+            } catch (error) {
+                console.error('Update failed:', error);
+            }
+        }
+        
+        function drawWorld(position, sensors) {
+            const canvas = document.getElementById('worldCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Grid
+            ctx.strokeStyle = '#003300';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(width, i);
+                ctx.stroke();
+            }
+            
+            // Scale and center
+            const scale = 20;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            
+            // Draw obstacles (fixed positions from simulator)
+            ctx.fillStyle = '#f00';
+            const obstacles = [[5, 5], [-3, 8], [10, -2]];
+            obstacles.forEach(obs => {
+                const x = centerX + obs[0] * scale;
+                const y = centerY - obs[1] * scale;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw robot
+            const robotX = centerX + position.x * scale;
+            const robotY = centerY - position.y * scale;
+            const angle = -position.orientation * Math.PI / 180;
+            
+            ctx.save();
+            ctx.translate(robotX, robotY);
+            ctx.rotate(angle);
+            
+            // Robot body
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(-10, -10, 20, 20);
+            
+            // Direction indicator
+            ctx.fillStyle = '#0ff';
+            ctx.beginPath();
+            ctx.moveTo(10, 0);
+            ctx.lineTo(20, -5);
+            ctx.lineTo(20, 5);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Draw sensor rays
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.3;
+            [-45, 0, 45].forEach((sensorAngle, i) => {
+                const rayAngle = angle + sensorAngle * Math.PI / 180;
+                const dist = sensors[i] * scale;
+                ctx.beginPath();
+                ctx.moveTo(robotX, robotY);
+                ctx.lineTo(
+                    robotX + Math.cos(rayAngle) * dist,
+                    robotY - Math.sin(rayAngle) * dist
+                );
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1;
+        }
+        
+        function startUpdates() {
+            if (!updateInterval) {
+                updateInterval = setInterval(updateStatus, 100);
+            }
+        }
+        
+        function stopUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+        }
+        
+        // Initialize log
+        log('🤖 Robot Brain Interface loaded');
+        log('⚡ Ready for initialization');
+    </script>
+</body>
+</html>

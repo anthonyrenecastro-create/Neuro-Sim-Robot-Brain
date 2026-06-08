@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPINN Prototype - Quantum AI Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica', Arial, sans-serif;
+            background: white;
+            color: black;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid black;
+            margin-bottom: 30px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid lightgray;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: lightgray;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .tab.active {
+            background: white;
+            border: 2px solid lightgray;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 2px solid lightgray;
+            border-radius: 0 5px 5px 5px;
+            min-height: 400px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid lightgray;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: lightgray;
+            border: 2px solid black;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 5px;
+            margin: 10px 5px 10px 0;
+        }
+        
+        button:hover {
+            background: #ddd;
+        }
+        
+        .output-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border: 2px solid lightgray;
+            border-radius: 5px;
+            margin: 10px 0;
+            min-height: 200px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+        }
+        
+        canvas {
+            border: 2px solid lightgray;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌀 SPINN Prototype - Quantum AI Interface</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('intake')">Intake</button>
+            <button class="tab" onclick="showTab('process')">Process</button>
+            <button class="tab" onclick="showTab('output')">Output</button>
+            <button class="tab" onclick="showTab('quantum')">Quantum AI</button>
+        </div>
+        
+        <!-- Intake Tab -->
+        <div id="intake" class="tab-content active">
+            <h2>Speech/Text Intake</h2>
+            <input type="text" id="intakeText" placeholder="Enter text input...">
+            <button onclick="processIntake()">Process Intake</button>
+            <div id="intakeStatus"></div>
+        </div>
+        
+        <!-- Process Tab -->
+        <div id="process" class="tab-content">
+            <h2>Data Processing</h2>
+            <button onclick="runProcess()">Run Processing</button>
+            <div id="processStatus"></div>
+            <div class="output-box" id="processOutput"></div>
+        </div>
+        
+        <!-- Output Tab -->
+        <div id="output" class="tab-content">
+            <h2>Response Output</h2>
+            <input type="text" id="queryText" placeholder="Enter your query...">
+            <button onclick="generateOutput()">Generate Output</button>
+            <div id="outputStatus"></div>
+            <div class="output-box" id="outputResult"></div>
+        </div>
+        
+        <!-- Quantum Tab -->
+        <div id="quantum" class="tab-content">
+            <h2>Quantum Error Correction</h2>
+            <button onclick="runQuantumMonitor()">Run Quantum Monitor</button>
+            <div id="quantumStatus"></div>
+            <div class="output-box" id="quantumOutput"></div>
+            <canvas id="coherenceChart" width="800" height="400"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        async function processIntake() {
+            const text = document.getElementById('intakeText').value;
+            const statusDiv = document.getElementById('intakeStatus');
+            
+            if (!text) {
+                statusDiv.innerHTML = '<div class="status info">Please enter text</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="status info">Processing...</div>';
+            
+            try {
+                const response = await fetch('/api/intake', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                });
+                
+                const result = await response.json();
+                statusDiv.innerHTML = `<div class="status success">✓ ${result.status}<br>Field Mean: ${result.field_mean.toFixed(3)}</div>`;
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status">Error: ${error}</div>`;
+            }
+        }
+        
+        async function runProcess() {
+            const statusDiv = document.getElementById('processStatus');
+            const outputDiv = document.getElementById('processOutput');
+            
+            statusDiv.innerHTML = '<div class="status info">Processing...</div>';
+            
+            try {
+                const response = await fetch('/api/process', {method: 'POST'});
+                const result = await response.json();
+                
+                statusDiv.innerHTML = `<div class="status success">✓ ${result.status}</div>`;
+                outputDiv.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status">Error: ${error}</div>`;
+            }
+        }
+        
+        async function generateOutput() {
+            const query = document.getElementById('queryText').value || 'Default query';
+            const statusDiv = document.getElementById('outputStatus');
+            const resultDiv = document.getElementById('outputResult');
+            
+            statusDiv.innerHTML = '<div class="status info">Generating...</div>';
+            
+            try {
+                const response = await fetch('/api/output', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query})
+                });
+                
+                const result = await response.json();
+                
+                statusDiv.innerHTML = '<div class="status success">✓ Output generated</div>';
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status">Error: ${error}</div>`;
+            }
+        }
+        
+        async function runQuantumMonitor() {
+            const statusDiv = document.getElementById('quantumStatus');
+            const outputDiv = document.getElementById('quantumOutput');
+            
+            statusDiv.innerHTML = '<div class="status info">Running quantum monitor...</div>';
+            
+            try {
+                const response = await fetch('/api/quantum');
+                const result = await response.json();
+                
+                statusDiv.innerHTML = `<div class="status success">✓ Coherence Mean: ${result.coherence_mean.toFixed(3)}</div>`;
+                outputDiv.textContent = JSON.stringify(result, null, 2);
+                
+                // Draw chart
+                drawCoherenceChart(result.coherence_levels);
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status">Error: ${error}</div>`;
+            }
+        }
+        
+        function drawCoherenceChart(data) {
+            const canvas = document.getElementById('coherenceChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw axes
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, 50);
+            ctx.lineTo(50, 350);
+            ctx.lineTo(750, 350);
+            ctx.stroke();
+            
+            // Draw data
+            if (data && data.length > 0) {
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                const xStep = 700 / (data.length - 1);
+                const yScale = 280;
+                
+                data.forEach((value, index) => {
+                    const x = 50 + index * xStep;
+                    const y = 350 - (value * yScale);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+            }
+            
+            // Labels
+            ctx.fillStyle = 'black';
+            ctx.font = '14px Helvetica';
+            ctx.fillText('Qubit Coherence Levels', 300, 30);
+            ctx.fillText('Qubit Index', 350, 380);
+            ctx.save();
+            ctx.translate(20, 200);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Coherence', 0, 0);
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+{
+  "timestamp": "2025-11-30T20:14:35.943030",
+  "training_log": [
+    {
+      "batch_name": "wikitext_batch_1",
+      "num_samples": 24,
+      "avg_variance": 234.68128659245357,
+      "results": [
+        {
+          "sample_id": 0,
+          "text_preview": "= Valkyria Chronicles III =",
+          "metrics": {
+            "intake": {
+              "status": "Intake processed",
+              "field_mean": -0.915686498279535
+            },
+            "process": {
+              "status": "Processed",
+              "creativity": [
+                "C+A/C-B+A-C*A",
+                "C-A-A-A*B+C-B",
+                "A*C*C/C+A*C-A",
+                "A+C/B+B+B*A*C",
+                "B+A-A+C-B/B-A",
+                "A*A*B-C-A-C/B",
+                "C+C+A-C-B*C/A",
+                "A/A/A*C*C-A-A"
+              ],
+              "logic": [
+                -0.14406897415006092,
+                -64.2107970924594,
+                16.289992731847168
+              ],
+              "llm_prompt": "A+C/B+B+B*A*C"
+            },
+            "output": {
+              "response": "Sim response to: B+A-A+C-B/B-A (Logic: -16.02). Query: = Valkyria C...",
+              "morphogenic_field": [
+                1.9583333333333333,
+                1.9462572875553301,
+                1.9101780838876679,
+                1.850540686533028,
+                1.76808060249451,
+                1.6638148105803252,
+                1.5390292190215231,
+                1.395262806387737,
+                1.2342886413907674,
+                1.0580920156584404
+              ],
+              "creative_prompt": "B+A-A+C-B/B-A",
+              "logical_val": -16.021624444920764
+            },
+            "text_length": 27,
+            "field_variance": 160.15370272497054
+          }
+        },
+        {
+          "sample_id": 1,
+          "text_preview": "Senj\u014d no Valkyria 3 : Unrecorded Chronicles ( Japanese : \u6226\u5834\u306e\u30f4\u30a1\u30eb\u30ad\u30e5\u30ea\u30a23 , lit . Valkyria of the Battlef",
+          "metrics": {
+            "intake": {
+              "status": "Intake processed",
+              "field_mean": 1.0836676416245572
+            },
+            "process": {
+              "status": "Processed",
+              "creativity": [
+                "C/C+C+C*A*C*A",
+                "B-A-C-C*C-B+C",
+                "A/A-A*A+A-B+A",
+                "A+A-B-A/A/A+A",
+                "C*C*B+C*A*A-A",
+                "B+B+C-B/C+B*B",
+                "B/C-C+A*B+C/A",
+                "B+C*C-B/A*C*C"
+              ],
+              "logic": [
+                -41.38889737536527,
+                23.051149082325168,
+                0.3318548605881759
+              ],
+              "llm_prompt": "B+C*C-B/A*C*C"
+            },
+            "output": {
+              "response": "Sim response to: A+A-B-A/A/A+A (Logic: -6.00). Query: Senj\u014d no Valk...",
+              "morphogenic_field": [
+                1.9583333333333333,
+                1.9462572875553301,
+                1.9101780838876679,
+                1.850540686533028,
+                1.76808060249451,
+                1.6638148105803252,
+                1.5390292190215231,
+                1.395262806387737,
+                1.2342886413907674,
+                1.0580920156584404
+              ],
+              "creative_prompt": "A+A-B-A/A/A+A",
+              "logical_val": -6.001964477483974
+            },
+            "text_length": 703,
+            "field_variance": 290.03834915524266
+          }
+        },
+        {
+          "sample_id": 2,
+          "text_preview": "The game began development in 2010 , carrying over a large portion of the work done on Valkyria Chro",
+          "metrics": {
+            "intake": {
+              "status": "Intake processed",
+              "field_mean": 1.0755196087422327
+            },
+            "process": {
+              "status": "Processed",
+              "creativity": [
+                "B/A/A/A*A+C-A",
+                "A+C-B/A+C*B-B",
+                "B-B*A*B-A+C*C",
+                "B/C/C+B+C*C-B",
+                "A+A+A-B/C+C-A",
+                "B-A+A-B*A+B+B",
+                "A*A*A/A+A-B+A",
+                "C/A/B*B+C*C*C"
+              ],
+              "logic": [
+                -0.7309377677745961,
+                17.34351164253651,
+                -45.94175040640939
+              ],
+              "llm_prompt": "A+A+A-B/C+C-A"
+            },
+            "output": {
+              "response": "Sim response to: B-B*A*B-A+C*C (Logic: -9.78). Query: The game bega...",
+              "morphogenic_field": [
+                1.9583333333333333,
+                1.9462572875553301,
+                1.9101780838876679,
+                1.850540686533028,
+                1.76808060249451,
+                1.6638148105803252,
+                1.5390292190215231,
+                1.395262806387737,
+                1.2342886413907674,
+                1.0580920156584404
+              ],
+              "creative_prompt": "B-B*A*B-A+C*C",
+              "logical_val": -9.776392177215826
+            },
+            "text_length": 521,
+            "field_variance": 197.87612307056125
+          }
+        },
+        {
+          "sample_id": 3,
+          "text_preview": "It met with positive sales in Japan , and was praised by both Japanese and western critics . After r",
+          "metrics": {
+            "intake": {
+              "status": "Intake processed",
+              "field_mean": 0.46350279591096993
+            },
+            "process": {
+              "status": "Processed",
+              "creativity": [
+                "B+A-C-A*B*A+B",
+                "B-A*C-A*A*A*A",
+                "B-C-A/C-B/A/B",
+                "C+C-C/C+B*C-A",
+                "C-C/B+A*C-B*A",
+                "A*B+A+C*C*B*B",
+                "A+C/B*C+B*C-B",
+                "C*B+A+B/C+B+B"
+              ],
+              "logic": [
+                1.146934319059797,
+                -38.16218439267363,
+                28.49468958339144
+              ],
+              "llm_prompt": "A*B+A+C*C*B*B"
+            },
+            "output": {
+              "response": "Sim response to: A+C/B*C+B*C-B (Logic: -2.84). Query: It met with p...",
+              "morphogenic_field": [
+                1.9583333333333333,
+                1.9462572875553301,
+                1.9101780838876679,
+                1.850540686533028,
+                1.76808060249451,
+                1.6638148105803252,
+                1.5390292190215231,
+                1.395262806387737,
+                1.2342886413907674,
+                1.0580920156584404
+              ],
+              "creative_prompt": "A+C/B*C+B*C-B",
+              "logical_val": -2.8401868300741313
+            },
+            "text_length": 571,
+            "field_variance": 236.7330215094886
+          }
+        },
+        {
+          "sample_id": 4,
+          "text_preview": "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing ",
+          "metrics": {
+            "intake": {
+              "status": "Intake processed",
+              "field_mean": 0.17063269029168762
+            },
+            "process": {
+              "status": "Processed",
+              "creativity": [
+                "C-A*B/C-A-A*C",
+                "A-A/A-C/C*C/B",
+                "C-A-C*A-B-A/A",
+                "A/B-C/C/B*A*C",
+                "C-B+C/C*C+A+A",
+                "C+B-C*C/C*B/A",
+                "C*B-C-B*C+B*C",
+                "A/A/B+B+B/C/A"
+              ],
+              "logic": [
+                0.4700121932705834,
+                -52.79949352648885,
+                29.437920595337292
+              ],
+              "llm_prompt": "A/B-C/C/B*A*C"
+            },
+            "output": {
+              "response": "Sim response to: A-A/A-C/C*C/B (Logic: -7.63). Query: As with previ...",
+              "morphogenic_field": [
+                1.9583333333333333,
+                1.9462572875553301,
+                1.9101780838876679,
+                1.850540686533028,
+                1.76808060249451,
+                1.6638148105803252,
+                1.5390292190215231,
+                1.395262806387737,
+                1.2342886413907674,
+                1.0580920156584404
+              ],
+              "creative_prompt": "A-A/A-C/C*C/B",
+              "logical_val": -7.630520245960326
+            },
+            "text_length": 1218,
+            "field_variance": 338.8383044836008
+          }
+        }
+      ]
+    },
+    {
+      "test_results": [
+        {
+          "query": "What is the meaning of life?",
+          "response": "Sim response to: A-A*B/B+C*B+C (Logic: -9.78). Query: What is the m...",
+          "creative_prompt": "A-A*B/B+C*B+C",
+          "logical_val": -9.782299224724067
+        },
+        {
+          "query": "Explain quantum mechanics",
+          "response": "Sim response to: B/C/A+C/B*C*A (Logic: -9.78). Query: Explain quant...",
+          "creative_prompt": "B/C/A+C/B*C*A",
+          "logical_val": -9.782299224724067
+        },
+        {
+          "query": "How does consciousness work?",
+          "response": "Sim response to: B+C*A-B*A/C+A (Logic: -9.78). Query: How does cons...",
+          "creative_prompt": "B+C*A-B*A/C+A",
+          "logical_val": -9.782299224724067
+        },
+        {
+          "query": "What is the nature of reality?",
+          "response": "Sim response to: C*B+A*B/B*A-A (Logic: -9.78). Query: What is the n...",
+          "creative_prompt": "C*B+A*B/B*A-A",
+          "logical_val": -9.782299224724067
+        }
+      ]
+    },
+    {
+      "quantum_analysis": {
+        "coherence_mean": 0.5397286426394885,
+        "coherence_levels": [
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885,
+          0.5397286426394885
+        ]
+      }
+    }
+  ],
+  "final_state": {
+    "creativity": [
+      "C*B+A*B/B*A-A",
+      "A/B*C*C*B-A*C",
+      "C*B*B-B-B/C/A",
+      "A-A*B/B+C*B+C",
+      "B+B-A-B*C-B+A",
+      "B+C*A-B*A/C+A",
+      "C*A+C/B-C/B/A",
+      "B/C/A+C/B*C*A"
+    ],
+    "logic": [
+      0.9667284745268367,
+      -61.48793181437229,
+      31.17430566567325
+    ],
+    "core_field_stats": {
+      "mean": -0.3639449675153969,
+      "variance": 347.30179909868605,
+      "std": 18.636034961833648
+    }
+  }
+}
