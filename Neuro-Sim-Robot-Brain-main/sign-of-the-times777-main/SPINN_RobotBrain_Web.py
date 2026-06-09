@@ -1,5 +1,5 @@
 """
-© 2026 Transcendental Gateways. All rights reserved.
+© 2026 Anthony Rene Castro. All rights reserved.
 Use of this software is governed by the LICENSE-RESEARCH.md file.
 
 SPINN Robot Brain Web API

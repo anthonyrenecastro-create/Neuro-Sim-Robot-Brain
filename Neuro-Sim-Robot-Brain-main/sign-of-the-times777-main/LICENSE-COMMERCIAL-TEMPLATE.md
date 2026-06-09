@@ -1,6 +1,6 @@
 # Commercial License Template (Draft)
 
-Copyright (c) 2026 Transcendental Gateways.
+Copyright (c) 2026 Anthony Rene Castro.
 All rights reserved.
 
 IMPORTANT: This template is provided for internal drafting only. It is not legal advice and is not an executed agreement.

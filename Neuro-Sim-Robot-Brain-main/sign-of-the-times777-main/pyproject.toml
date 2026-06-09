@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = "LicenseRef-Research-Eval"
 license-files = ["LICENSE-RESEARCH.md", "LICENSE-COMMERCIAL-TEMPLATE.md"]
 authors = [
-  { name = "Transcendental Gateways" }
+  { name = "Anthony Rene Castro" }
 ]
 dependencies = [
   "numpy>=1.24",
@@ -27,9 +27,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Transcendental-Gateways/sign-of-the-times777"
-Repository = "https://github.com/Transcendental-Gateways/sign-of-the-times777"
-Documentation = "https://github.com/Transcendental-Gateways/sign-of-the-times777/blob/main/README.md"
+Homepage = "https://github.com/anthonyrenecastro-create/Neuro-Sim-Robot-Brain"
+Repository = "https://github.com/anthonyrenecastro-create/Neuro-Sim-Robot-Brain"
+Documentation = "https://github.com/anthonyrenecastro-create/Neuro-Sim-Robot-Brain/blob/main/README.md"
 
 [project.optional-dependencies]
 dev = [

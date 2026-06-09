@@ -1,7 +1,7 @@
 # Research and Evaluation License
 
 **SPINN NeuroSeer - Robot Brain Control System**  
-Copyright © 2026 Transcendental Gateways. All rights reserved.
+Copyright © 2026 Anthony Rene Castro. All rights reserved.
 
 ## Permitted Use
 
@@ -25,8 +25,8 @@ The following activities are **PROHIBITED** without prior written permission fro
 
 Any intended use beyond the permitted scope outlined above **REQUIRES** prior written authorization. To request permission, contact:
 
-**Transcendental Gateways**  
-Repository: https://github.com/Transcendental-Gateways/sign-of-the-times777  
+**Anthony Rene Castro**  
+Repository: https://github.com/anthonyrenecastro-create/Neuro-Sim-Robot-Brain  
 Contact via: GitHub Issues or repository maintainer
 
 Unauthorized commercial use, deployment, or redistribution will be subject to legal action.

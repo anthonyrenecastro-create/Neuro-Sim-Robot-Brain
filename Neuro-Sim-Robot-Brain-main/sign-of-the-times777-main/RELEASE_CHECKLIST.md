@@ -18,3 +18,10 @@
 - [ ] Commercial license terms executed
 - [ ] Deployment constraints documented
 - [ ] Customer safety obligations documented
+
+## Repository Migration Safeguards
+
+- [ ] Export/archive open issues and PR discussions from legacy repository
+- [ ] Snapshot stars/watchers counts and release notes from legacy repository
+- [ ] Mirror Git tags and release artifacts into canonical repository
+- [ ] Update all docs, package metadata, and badges to canonical repository URL
