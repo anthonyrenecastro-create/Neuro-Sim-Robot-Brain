@@ -17,9 +17,14 @@ from collections import deque
 import threading
 import time
 import logging
+import os
+import uuid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+MOTOR_ABS_MAX = 100.0
+SENSOR_ABS_MAX = 1000.0
 
 # ============================================================================
 # CORE SNN MODULES
@@ -225,6 +230,10 @@ class RobotBrain:
         self.loop_period_sec = 0.0
         self._state_lock = threading.RLock()
         self._stop_event = threading.Event()
+        self.deadman_timeout_sec = max(float(os.getenv("SPINN_DEADMAN_TIMEOUT_SEC", "0.5")), 0.05)
+        self.last_motor_dispatch_ts = None
+        self.last_deadman_trip_ts = None
+        self.fault_events = deque(maxlen=200)
         
         # Timestamp tracking
         self.last_t0 = None
@@ -232,14 +241,51 @@ class RobotBrain:
         self.last_t1 = None
         
         print("✓ Robot Brain online")
+
+    def _record_fault(self, event: str, message: str, severity: str = "error", **details):
+        fault = {
+            'event_id': str(uuid.uuid4()),
+            'event': event,
+            'severity': severity,
+            'message': message,
+            'timestamp': time.time(),
+            'details': details,
+        }
+        with self._state_lock:
+            self.fault_events.append(fault)
+        log_line = f"{event} id={fault['event_id']} msg={message} details={details}"
+        if severity == "critical":
+            logger.critical(log_line)
+        elif severity == "warning":
+            logger.warning(log_line)
+        else:
+            logger.error(log_line)
+
+    def _safe_stop_command(self, mode='differential'):
+        return {
+            'left_motor': 0.0,
+            'right_motor': 0.0,
+            'mode': mode,
+            'timestamp': time.time(),
+        }
+
+    def _sanitize_sensor_data(self, sensor_data):
+        if sensor_data is None:
+            raise ValueError("sensor_data is None")
+        arr = np.asarray(sensor_data, dtype=float).flatten()
+        if arr.size == 0:
+            raise ValueError("sensor_data is empty")
+        arr = np.nan_to_num(arr, nan=0.0, posinf=SENSOR_ABS_MAX, neginf=0.0)
+        arr = np.clip(arr, 0.0, SENSOR_ABS_MAX)
+        if arr.size < 3:
+            arr = np.pad(arr, (0, 3 - arr.size), mode='constant', constant_values=0.0)
+        return arr[:3]
     
     def perceive(self, sensor_data):
         """Process sensory input through SNN with synaptic trace decoding"""
         try:
             # Validate sensor data
-            if sensor_data is None or len(sensor_data) == 0:
-                logger.error("Invalid sensor data received")
-                return self._get_default_perception()
+            sensor_data = self._sanitize_sensor_data(sensor_data)
             
             # Sensor fusion with continuous trace signals
             perception = self.sensor_fusion.process_sensors(sensor_data)
@@ -258,7 +304,7 @@ class RobotBrain:
             initial = [perception['confidence'], perception['cluster'], np.mean(trace_signals)]
             chaos = odeint(lorenz_system, initial, t, rtol=1e-3, atol=1e-6)
         except Exception as e:
-            logger.error(f"Perception error: {e}")
+            self._record_fault("perception_error", str(e), severity="error")
             return self._get_default_perception()
         
         return {
@@ -283,8 +329,13 @@ class RobotBrain:
         """High-level decision making through morphogenic evolution"""
         try:
             if perception is None:
-                logger.warning("Null perception in think()")
-                return {'decision': 'emergency_stop', 'motor_command': {'left_motor': 0, 'right_motor': 0}}
+                self._record_fault("decision_input_null", "Null perception in think()", severity="warning")
+                return {'decision': 'stop', 'motor_command': {'left_motor': 0, 'right_motor': 0}}
+
+            threat = perception.get('threat_level', 1.0)
+            if not np.isfinite(threat):
+                raise ValueError("non-finite threat level")
+            perception['threat_level'] = float(np.clip(threat, 0.0, 1.0))
             
             with self._state_lock:
                 self.decision_buffer.append(perception)
@@ -293,8 +344,8 @@ class RobotBrain:
             with self._state_lock:
                 threat_avg = np.mean([p.get('threat_level', 0) for p in self.decision_buffer])
         except Exception as e:
-            logger.error(f"Decision making error: {e}")
-            return {'decision': 'emergency_stop', 'motor_command': {'left_motor': 0, 'right_motor': 0}}
+            self._record_fault("decision_error", str(e), severity="error")
+            return {'decision': 'stop', 'motor_command': {'left_motor': 0, 'right_motor': 0}}
         
         # Select behavior from evolved library
         if threat_avg > 0.6:
@@ -340,8 +391,8 @@ class RobotBrain:
         """Execute motor commands through PID control"""
         try:
             if decision is None:
-                logger.error("Null decision in act()")
-                return {'left_motor': 0, 'right_motor': 0, 'mode': motor_mode, 'timestamp': time.time()}
+                self._record_fault("action_input_null", "Null decision in act()", severity="error")
+                return self._safe_stop_command(mode=motor_mode)
             
             actions = {
                 'avoid_obstacle': {'left': -50, 'right': 50},  # Turn right
@@ -350,10 +401,13 @@ class RobotBrain:
                 'stop': {'left': 0, 'right': 0}
             }
             
-            target = actions.get(decision['decision'], {'left': 0, 'right': 0})
+            decision_key = decision.get('decision', 'stop') if isinstance(decision, dict) else 'stop'
+            target = actions.get(decision_key, {'left': 0, 'right': 0})
+            if not np.isfinite(target['left']) or not np.isfinite(target['right']):
+                raise ValueError("non-finite motor target")
         except Exception as e:
-            logger.error(f"Action execution error: {e}")
-            return {'left_motor': 0, 'right_motor': 0, 'mode': motor_mode, 'timestamp': time.time()}
+            self._record_fault("action_error", str(e), severity="error")
+            return self._safe_stop_command(mode=motor_mode)
         
         # PID control for smooth motor actuation
         left_cmd = self.motor_left.control(target['left'])
@@ -362,10 +416,14 @@ class RobotBrain:
         # Apply syntropy field damping for smooth transitions
         t = np.linspace(0, 0.5, 10)
         damp = syntropy_field(np.array([left_cmd, right_cmd]), t)
+
+        if damp is None or len(damp) == 0 or not np.all(np.isfinite(damp[-1])):
+            self._record_fault("action_damping_invalid", "Invalid damped motor output", severity="error")
+            return self._safe_stop_command(mode=motor_mode)
         
         motor_output = {
-            'left_motor': float(damp[-1, 0]),
-            'right_motor': float(damp[-1, 1]),
+            'left_motor': float(np.clip(damp[-1, 0], -MOTOR_ABS_MAX, MOTOR_ABS_MAX)),
+            'right_motor': float(np.clip(damp[-1, 1], -MOTOR_ABS_MAX, MOTOR_ABS_MAX)),
             'mode': motor_mode,
             'timestamp': time.time()
         }
@@ -408,7 +466,24 @@ class RobotBrain:
                 with self._state_lock:
                     self.last_t_action = t_action
                 motor_cmd = self.act(decision)
+
+                cmd_ts = float(motor_cmd.get('timestamp', 0.0)) if isinstance(motor_cmd, dict) else 0.0
+                cmd_age = max(0.0, time.time() - cmd_ts)
+                if cmd_age > self.deadman_timeout_sec:
+                    self._record_fault(
+                        "deadman_timeout",
+                        "Motor command stale, forcing stop",
+                        severity="critical",
+                        cmd_age_sec=round(cmd_age, 6),
+                        timeout_sec=self.deadman_timeout_sec,
+                    )
+                    with self._state_lock:
+                        self.last_deadman_trip_ts = time.time()
+                    motor_cmd = self._safe_stop_command(mode='deadman')
+
                 motor_callback(motor_cmd)
+                with self._state_lock:
+                    self.last_motor_dispatch_ts = time.time()
                 
                 t1 = time.time()  # Loop end time
                 with self._state_lock:
@@ -429,12 +504,22 @@ class RobotBrain:
                     
             except Exception as e:
                 error_count += 1
-                logger.error(f"Brain loop error ({error_count}/{max_errors}): {e}")
+                self._record_fault(
+                    "brain_loop_error",
+                    str(e),
+                    severity="error",
+                    error_count=error_count,
+                    max_errors=max_errors,
+                )
                 
                 # Emergency stop on repeated errors
                 if error_count >= max_errors:
-                    logger.critical("Too many errors, initiating emergency stop")
-                    motor_callback({'left_motor': 0, 'right_motor': 0})
+                    self._record_fault(
+                        "brain_loop_emergency_stop",
+                        "Too many loop errors, initiating emergency stop",
+                        severity="critical",
+                    )
+                    motor_callback(self._safe_stop_command(mode='emergency'))
                     with self._state_lock:
                         self.running = False
                     self._stop_event.set()
@@ -442,7 +527,7 @@ class RobotBrain:
                 
                 # Try to continue with safe defaults
                 try:
-                    motor_callback({'left_motor': 0, 'right_motor': 0})
+                    motor_callback(self._safe_stop_command(mode='fallback'))
                 except:
                     pass
                 
@@ -503,6 +588,9 @@ class RobotBrain:
             last_t0 = self.last_t0
             last_t_action = self.last_t_action
             last_t1 = self.last_t1
+            last_motor_dispatch_ts = self.last_motor_dispatch_ts
+            last_deadman_trip_ts = self.last_deadman_trip_ts
+            recent_fault_count = len(self.fault_events)
 
         avg_loop_duration = float(np.mean(loop_durations)) if loop_durations else 0.0
         loop_frequency_hz = (1.0 / avg_loop_duration) if avg_loop_duration > 0 else 0.0
@@ -527,7 +615,11 @@ class RobotBrain:
             'decision_rate': decision_rate,
             'last_t0': last_t0,
             'last_t_action': last_t_action,
-            'last_t1': last_t1
+            'last_t1': last_t1,
+            'last_motor_dispatch_ts': last_motor_dispatch_ts,
+            'deadman_timeout_sec': self.deadman_timeout_sec,
+            'last_deadman_trip_ts': last_deadman_trip_ts,
+            'recent_fault_count': recent_fault_count,
         }
 
 # ============================================================================

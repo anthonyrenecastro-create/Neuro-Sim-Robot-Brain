@@ -12,6 +12,7 @@ from enum import Enum
 from typing import List, Optional, Dict
 import time
 import logging
+import uuid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,9 +97,30 @@ class SafetyMonitor:
         self.last_transition_time: Optional[float] = None
         self.last_estop_sim_time = 0.0
         self.last_estop_response_ms: Optional[float] = None
+        self.incident_log: List[Dict] = []
         
         # Safety violations log
         self.violation_history = []
+
+    def _record_event(self, event_type: str, severity: str, **details):
+        event = {
+            'event_id': str(uuid.uuid4()),
+            'timestamp': time.time(),
+            'event_type': event_type,
+            'severity': severity,
+            'details': details,
+        }
+        self.incident_log.append(event)
+        if len(self.incident_log) > 500:
+            self.incident_log = self.incident_log[-500:]
+
+        line = f"safety_event type={event_type} id={event['event_id']} details={details}"
+        if severity == 'critical':
+            logger.critical(line)
+        elif severity == 'warning':
+            logger.warning(line)
+        else:
+            logger.info(line)
         
     def check_velocity_limits(self, linear_vel: float, angular_vel: float) -> bool:
         """Verify velocity within safe limits"""
@@ -191,6 +213,12 @@ class SafetyMonitor:
         if elapsed > self.constraints.watchdog_timeout:
             self._trigger_failure(FailureMode.COMMUNICATION_LOSS)
             self._set_safety_level(SafetyLevel.EMERGENCY)
+            self._record_event(
+                'watchdog_timeout',
+                'critical',
+                elapsed_sec=round(elapsed, 6),
+                timeout_sec=self.constraints.watchdog_timeout,
+            )
             return False
         return True
 
@@ -206,6 +234,12 @@ class SafetyMonitor:
             self.last_transition_time = transition['timestamp']
             self.last_safety_level = self.safety_level
             self.safety_level = level
+            self._record_event(
+                'safety_level_transition',
+                'warning' if level.value >= SafetyLevel.WARNING.value else 'info',
+                from_level=transition['from'],
+                to_level=transition['to'],
+            )
     
     def enforce_safe_command(self, left_motor: float, right_motor: float, 
                             sensor_distances: np.ndarray = None) -> tuple:
@@ -227,6 +261,12 @@ class SafetyMonitor:
         if safety_level == SafetyLevel.EMERGENCY:
             logger.error("Emergency stop - obstacle too close")
             self.emergency_stop_active = True
+            self._record_event(
+                'emergency_stop_enforced',
+                'critical',
+                left_motor=float(left_motor),
+                right_motor=float(right_motor),
+            )
             return 0.0, 0.0
         
         # Apply safety scaling based on level
@@ -253,12 +293,14 @@ class SafetyMonitor:
         if mode not in self.active_failures:
             self.active_failures.append(mode)
             logger.warning(f"Failure mode triggered: {mode.value}")
+            self._record_event('failure_mode_triggered', 'warning', mode=mode.value)
     
     def clear_failure(self, mode: FailureMode):
         """Clear failure mode after recovery"""
         if mode in self.active_failures:
             self.active_failures.remove(mode)
             logger.info(f"Failure mode cleared: {mode.value}")
+            self._record_event('failure_mode_cleared', 'info', mode=mode.value)
     
     def _log_violation(self, message: str, actual: float, limit: float):
         """Log safety violation"""
@@ -270,6 +312,13 @@ class SafetyMonitor:
         }
         self.violation_history.append(violation)
         logger.warning(f"Safety violation: {message} (actual={actual:.2f}, limit={limit:.2f})")
+        self._record_event(
+            'safety_violation',
+            'warning',
+            message=message,
+            actual=float(actual),
+            limit=float(limit),
+        )
     
     def get_status(self) -> Dict:
         """Get safety system status"""
@@ -281,7 +330,9 @@ class SafetyMonitor:
             'violations_count': len(self.violation_history),
             'watchdog_ok': self.check_watchdog(),
             'safety_transitions': len(self.safety_transition_history),
-            'last_transition': last_transition
+            'last_transition': last_transition,
+            'incident_count': len(self.incident_log),
+            'last_incident': self.incident_log[-1] if self.incident_log else None,
         }
     
     def reset_emergency_stop(self):
@@ -290,6 +341,7 @@ class SafetyMonitor:
         self.emergency_stop_active = False
         self.active_failures = []
         self._set_safety_level(SafetyLevel.NOMINAL)
+        self._record_event('emergency_stop_reset', 'info')
 
     def simulate_emergency_stop_response(self, sensor_distances: Optional[np.ndarray] = None) -> Optional[float]:
         """Simulate emergency stop response time without persistent side effects"""

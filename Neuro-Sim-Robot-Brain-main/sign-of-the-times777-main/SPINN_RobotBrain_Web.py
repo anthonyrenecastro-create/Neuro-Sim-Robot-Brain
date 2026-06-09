@@ -15,8 +15,61 @@ import numpy as np
 import os
 import threading
 import time
+import logging
+from functools import wraps
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("SPINN_MAX_REQUEST_BYTES", "16384"))
+
+API_KEY = os.getenv("SPINN_API_KEY", "").strip()
+RATE_LIMIT_PER_MIN = max(int(os.getenv("SPINN_API_RATE_LIMIT_PER_MIN", "240")), 1)
+_rate_limit_lock = threading.RLock()
+_rate_limit_window_sec = 60
+_rate_limit_state = {}
+
+
+def _client_ip() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _check_rate_limit() -> bool:
+    now = time.time()
+    client = _client_ip()
+    with _rate_limit_lock:
+        state = _rate_limit_state.get(client)
+        if state is None or (now - state["window_start"]) >= _rate_limit_window_sec:
+            _rate_limit_state[client] = {"window_start": now, "count": 1}
+            return True
+        if state["count"] >= RATE_LIMIT_PER_MIN:
+            return False
+        state["count"] += 1
+        return True
+
+
+def _require_auth():
+    if not API_KEY:
+        return True
+    provided = request.headers.get("X-API-Key", "")
+    return provided == API_KEY
+
+
+def protected_api(handler):
+    @wraps(handler)
+    def wrapped(*args, **kwargs):
+        if not _check_rate_limit():
+            return jsonify({"error": "rate limit exceeded"}), 429
+        if not _require_auth():
+            return jsonify({"error": "unauthorized"}), 401
+        if request.method in {"POST", "PUT", "PATCH"} and request.data and not request.is_json:
+            return jsonify({"error": "JSON body required"}), 415
+        return handler(*args, **kwargs)
+
+    return wrapped
 
 class RuntimeState:
     """Shared runtime state guarded by a single re-entrant lock."""
@@ -34,11 +87,27 @@ class RuntimeState:
 
 runtime = RuntimeState()
 
+
+@app.after_request
+def apply_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc):
+    logger.exception("unhandled_api_error path=%s method=%s", request.path, request.method)
+    return jsonify({"error": "internal server error"}), 500
+
 @app.route('/')
 def index():
     return render_template('robot.html')
 
 @app.route('/api/robot/init', methods=['POST'])
+@protected_api
 def init_robot():
     """Initialize robot brain"""
     old_brain = None
@@ -97,6 +166,7 @@ def init_robot():
     })
 
 @app.route('/api/robot/start', methods=['POST'])
+@protected_api
 def start_robot():
     """Start autonomous operation with safety monitoring"""
     with runtime.lock:
@@ -127,6 +197,15 @@ def start_robot():
 
             if hardware is None:
                 return None
+
+            try:
+                cmd = {
+                    'left_motor': float(cmd.get('left_motor', 0.0)),
+                    'right_motor': float(cmd.get('right_motor', 0.0)),
+                }
+            except Exception:
+                logger.error("invalid_motor_command_payload payload=%s", cmd)
+                cmd = {'left_motor': 0.0, 'right_motor': 0.0}
 
             if kalman_filter and last_perception:
                 trace_signals = last_perception.get('trace_signals', [0, 0, 0])
@@ -169,6 +248,7 @@ def start_robot():
     return jsonify({'status': 'already_running'})
 
 @app.route('/api/robot/stop', methods=['POST'])
+@protected_api
 def stop_robot():
     """Stop autonomous operation"""
     with runtime.lock:
@@ -188,6 +268,7 @@ def stop_robot():
     return jsonify({'status': 'not_running'})
 
 @app.route('/api/robot/status', methods=['GET'])
+@protected_api
 def get_status():
     """Get current robot status with all metrics"""
     with runtime.lock:
@@ -316,12 +397,13 @@ def get_status():
     })
 
 @app.route('/api/robot/manual', methods=['POST'])
+@protected_api
 def manual_control():
     """Manual motor control override"""
     with runtime.lock:
         hardware = runtime.hardware
 
-    data = request.json
+    data = request.get_json(silent=True) or {}
     left = data.get('left', 0)
     right = data.get('right', 0)
 
@@ -339,6 +421,7 @@ def manual_control():
     return jsonify({'error': 'Hardware backend not initialized'}), 400
 
 @app.route('/api/robot/sensors', methods=['GET'])
+@protected_api
 def get_sensors():
     """Get raw sensor data"""
     with runtime.lock:
@@ -354,6 +437,7 @@ def get_sensors():
     return jsonify({'error': 'Hardware backend not initialized'}), 400
 
 @app.route('/api/robot/behavior', methods=['GET'])
+@protected_api
 def get_behavior():
     """Get current behavior library"""
     with runtime.lock:
@@ -370,6 +454,7 @@ def get_behavior():
     return jsonify({'error': 'Brain not initialized'}), 400
 
 @app.route('/api/robot/reset', methods=['POST'])
+@protected_api
 def reset_robot():
     """Reset robot to origin"""
     with runtime.lock:

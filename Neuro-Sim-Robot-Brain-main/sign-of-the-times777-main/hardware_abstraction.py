@@ -11,11 +11,62 @@ from dataclasses import dataclass
 import json
 import threading
 import time
+import os
 from typing import Any, Dict, Optional
+import logging
 
 import numpy as np
 
 from SPINN_RobotBrain import RobotSimulator
+
+
+logger = logging.getLogger(__name__)
+MOTOR_ABS_MAX = 100.0
+
+
+class _MotorCommandGuard:
+    """Normalizes, clamps, and slew-rate limits motor commands."""
+
+    def __init__(self, max_abs: float = MOTOR_ABS_MAX, max_delta_per_sec: float = 400.0):
+        self.max_abs = float(max_abs)
+        self.max_delta_per_sec = float(max_delta_per_sec)
+        self._last_cmd = np.zeros(2, dtype=float)
+        self._last_ts = time.monotonic()
+        self._last_warn_ts = 0.0
+        self._lock = threading.RLock()
+
+    def sanitize(self, motor_cmd: Dict[str, float]) -> Dict[str, float]:
+        with self._lock:
+            left = float(motor_cmd.get("left_motor", 0.0))
+            right = float(motor_cmd.get("right_motor", 0.0))
+            cmd = np.array([left, right], dtype=float)
+            cmd = np.nan_to_num(cmd, nan=0.0, posinf=self.max_abs, neginf=-self.max_abs)
+            cmd = np.clip(cmd, -self.max_abs, self.max_abs)
+
+            now = time.monotonic()
+            dt = max(now - self._last_ts, 1e-6)
+            max_step = self.max_delta_per_sec * dt
+            delta = np.clip(cmd - self._last_cmd, -max_step, max_step)
+            limited = self._last_cmd + delta
+
+            self._last_cmd = limited
+            self._last_ts = now
+
+            if not np.allclose(cmd, limited):
+                should_warn = (now - self._last_warn_ts) >= 1.0
+                self._last_warn_ts = now if should_warn else self._last_warn_ts
+                if should_warn:
+                    logger.warning(
+                        "motor_command_rate_limited requested=%s applied=%s dt=%.6f",
+                        cmd.tolist(),
+                        limited.tolist(),
+                        dt,
+                    )
+
+            return {
+                "left_motor": float(limited[0]),
+                "right_motor": float(limited[1]),
+            }
 
 
 @dataclass
@@ -56,6 +107,10 @@ class SimulatedRobotHardware(RobotHardwareInterface):
     def __init__(self, simulator: Optional[RobotSimulator] = None):
         self._sim = simulator if simulator is not None else RobotSimulator()
         self._lock = threading.RLock()
+        self._guard = _MotorCommandGuard(
+            max_abs=float(os.getenv("SPINN_MOTOR_ABS_MAX", str(MOTOR_ABS_MAX))),
+            max_delta_per_sec=float(os.getenv("SPINN_MOTOR_MAX_DELTA_PER_SEC", "400.0")),
+        )
 
     def get_sensors(self) -> np.ndarray:
         with self._lock:
@@ -63,7 +118,8 @@ class SimulatedRobotHardware(RobotHardwareInterface):
 
     def set_motors(self, motor_cmd: Dict[str, float]) -> Dict[str, float]:
         with self._lock:
-            return self._sim.set_motors(motor_cmd)
+            safe_cmd = self._guard.sanitize(motor_cmd)
+            return self._sim.set_motors(safe_cmd)
 
     def get_pose(self) -> Pose2D:
         with self._lock:
@@ -107,6 +163,10 @@ class SerialJsonRobotHardware(RobotHardwareInterface):
         serial_conn: Optional[Any] = None,
     ):
         self._lock = threading.RLock()
+        self._guard = _MotorCommandGuard(
+            max_abs=float(os.getenv("SPINN_MOTOR_ABS_MAX", str(MOTOR_ABS_MAX))),
+            max_delta_per_sec=float(os.getenv("SPINN_MOTOR_MAX_DELTA_PER_SEC", "400.0")),
+        )
         if serial_conn is not None:
             self._ser = serial_conn
             return
@@ -149,11 +209,14 @@ class SerialJsonRobotHardware(RobotHardwareInterface):
     def get_sensors(self) -> np.ndarray:
         response = self._rpc("get_sensors")
         sensors = response.get("sensors", [0.0, 0.0, 0.0])
-        return np.asarray(sensors, dtype=float)
+        values = np.asarray(sensors, dtype=float)
+        values = np.nan_to_num(values, nan=0.0, posinf=1000.0, neginf=0.0)
+        return values
 
     def set_motors(self, motor_cmd: Dict[str, float]) -> Dict[str, float]:
-        left = float(motor_cmd.get("left_motor", 0.0))
-        right = float(motor_cmd.get("right_motor", 0.0))
+        safe_cmd = self._guard.sanitize(motor_cmd)
+        left = float(safe_cmd.get("left_motor", 0.0))
+        right = float(safe_cmd.get("right_motor", 0.0))
         response = self._rpc("set_motors", left_motor=left, right_motor=right)
         pose = response.get("pose", {})
         return {
@@ -345,6 +408,10 @@ class Ros2RobotHardware(RobotHardwareInterface):
         ros_client: Optional[Any] = None,
     ):
         self._lock = threading.RLock()
+        self._guard = _MotorCommandGuard(
+            max_abs=float(os.getenv("SPINN_MOTOR_ABS_MAX", str(MOTOR_ABS_MAX))),
+            max_delta_per_sec=float(os.getenv("SPINN_MOTOR_MAX_DELTA_PER_SEC", "400.0")),
+        )
         self._client = (
             ros_client
             if ros_client is not None
@@ -364,7 +431,8 @@ class Ros2RobotHardware(RobotHardwareInterface):
 
     def set_motors(self, motor_cmd: Dict[str, float]) -> Dict[str, float]:
         with self._lock:
-            return self._client.set_motors(motor_cmd)
+            safe_cmd = self._guard.sanitize(motor_cmd)
+            return self._client.set_motors(safe_cmd)
 
     def get_pose(self) -> Pose2D:
         with self._lock:
