@@ -11,10 +11,10 @@ Subject to payment and compliance with this Agreement, Licensor grants Licensee 
 
 ## 2. Scope
 
-- Licensed Products: [DEFINE]
-- Territory: [DEFINE]
-- Term: [DEFINE]
-- Deployment limits: [DEFINE]
+- Licensed Products: SPINN NeuroSeer software components and accompanying documentation distributed from the canonical repository.
+- Territory: Worldwide, subject to export control laws and local safety regulations.
+- Term: 12 months from Effective Date, renewable by written agreement.
+- Deployment limits: Limited to approved systems and environments documented in the executed order form and safety validation package.
 
 ## 3. Safety and Compliance Obligations
 
@@ -33,9 +33,9 @@ Licensee may not:
 
 ## 5. Fees and Reporting
 
-- License Fee: [DEFINE]
-- Royalty (if any): [DEFINE]
-- Reporting cadence: [DEFINE]
+- License Fee: As specified in the executed commercial order form.
+- Royalty (if any): As specified in the executed commercial order form.
+- Reporting cadence: Quarterly usage and deployment compliance report from Licensee.
 
 ## 6. Warranty and Liability
 
@@ -48,5 +48,7 @@ This Agreement may be terminated for breach, non-payment, or safety non-complian
 ## 8. Signatures
 
 Licensor: ___________________ Date: __________
+Licensor Contact: anthony.castro@axiomzetainnovations.org
 
 Licensee: ___________________ Date: __________
+Licensee Contact: ___________________

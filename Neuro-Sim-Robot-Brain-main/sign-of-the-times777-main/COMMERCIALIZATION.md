@@ -2,6 +2,9 @@
 
 This repository ships under a research and evaluation license by default. Use the steps below to move cleanly toward commercial release readiness.
 
+Canonical repository: https://github.com/anthonyrenecastro-create/Neuro-Sim-Robot-Brain
+Licensor contact: anthony.castro@axiomzetainnovations.org
+
 ## 1. License Transition Gate
 
 1. Keep non-commercial usage under `LICENSE-RESEARCH.md`.
