@@ -453,6 +453,146 @@ def get_behavior():
 
     return jsonify({'error': 'Brain not initialized'}), 400
 
+
+def _cognition_config_schema():
+    """Lightweight schema for UI clients configuring cognition at runtime."""
+    return {
+        'version': '1.0',
+        'endpoint': '/api/robot/cognition',
+        'methods': ['GET', 'PATCH'],
+        'patch_fields': {
+            'enabled': {
+                'type': 'boolean',
+                'required': False,
+                'description': 'Enable or disable slow-brain cognition worker.',
+            },
+            'min_interval_sec': {
+                'type': 'number',
+                'required': False,
+                'minimum': 0.05,
+                'description': 'Minimum seconds between slow-brain requests.',
+            },
+            'directive_ttl_sec': {
+                'type': 'number',
+                'required': False,
+                'minimum': 0.1,
+                'description': 'How long a directive remains eligible for use.',
+            },
+            'llm_api_base': {
+                'type': 'string',
+                'required_with': ['llm_model'],
+                'description': 'Base URL for OpenAI-compatible API.',
+            },
+            'llm_api_endpoint': {
+                'type': 'string',
+                'required': False,
+                'default': '/chat/completions',
+                'description': 'API path for chat completions.',
+            },
+            'llm_model': {
+                'type': 'string',
+                'required_with': ['llm_api_base'],
+                'description': 'Model identifier at vendor endpoint.',
+            },
+            'llm_api_key': {
+                'type': 'string',
+                'required': False,
+                'sensitive': True,
+                'description': 'Optional token or API key for vendor auth.',
+            },
+            'llm_timeout_sec': {
+                'type': 'number',
+                'required': False,
+                'minimum': 0.1,
+                'description': 'Per-request timeout for the LLM call.',
+            },
+            'llm_auth_header': {
+                'type': 'string',
+                'required': False,
+                'default': 'Authorization',
+                'description': 'Header used to carry auth credentials.',
+            },
+            'llm_auth_scheme': {
+                'type': 'string',
+                'required': False,
+                'default': 'Bearer',
+                'description': 'Auth scheme prefix used with the API key.',
+            },
+            'llm_extra_headers': {
+                'type': 'object',
+                'required': False,
+                'description': 'Additional static HTTP headers for vendor routing.',
+            },
+        },
+        'response_fields': {
+            'enabled': 'boolean',
+            'config': 'object',
+            'status': 'object',
+            'cognition_status': 'object',
+            'schema': 'object',
+        },
+    }
+
+
+@app.route('/api/robot/cognition/schema', methods=['GET'])
+@protected_api
+def get_cognition_schema():
+    """Get schema-only cognition config metadata for UI clients."""
+    return jsonify(_cognition_config_schema())
+
+
+@app.route('/api/robot/cognition', methods=['GET'])
+@protected_api
+def get_cognition_config():
+    """Get current slow-brain cognition configuration and status."""
+    with runtime.lock:
+        brain = runtime.brain
+
+    if brain is None:
+        return jsonify({'error': 'Brain not initialized', 'schema': _cognition_config_schema()}), 400
+
+    cognition = getattr(brain, 'cognition', None)
+    if cognition is None:
+        return jsonify({'enabled': False, 'config': {}, 'status': {}, 'schema': _cognition_config_schema()})
+
+    return jsonify({
+        'enabled': bool(cognition.get_config().get('enabled', False)),
+        'config': cognition.get_config(),
+        'status': cognition.status(),
+        'schema': _cognition_config_schema(),
+    })
+
+
+@app.route('/api/robot/cognition', methods=['PATCH'])
+@protected_api
+def update_cognition_config():
+    """Update slow-brain cognition configuration at runtime without restart."""
+    with runtime.lock:
+        brain = runtime.brain
+
+    if brain is None:
+        return jsonify({'error': 'Brain not initialized', 'schema': _cognition_config_schema()}), 400
+
+    cognition = getattr(brain, 'cognition', None)
+    if cognition is None:
+        return jsonify({'error': 'Cognition layer unavailable', 'schema': _cognition_config_schema()}), 400
+
+    patch = request.get_json(silent=True) or {}
+    try:
+        updated = cognition.update_config(patch)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.exception("cognition_update_failed")
+        return jsonify({'error': f'Failed to update cognition config: {e}'}), 500
+
+    return jsonify({
+        'status': 'updated',
+        'config': updated,
+        'cognition_status': cognition.status(),
+        'schema': _cognition_config_schema(),
+    })
+
 @app.route('/api/robot/reset', methods=['POST'])
 @protected_api
 def reset_robot():
@@ -488,6 +628,9 @@ if __name__ == '__main__':
     print("  POST /api/robot/manual    - Manual control")
     print("  GET  /api/robot/sensors   - Get sensor readings")
     print("  GET  /api/robot/behavior  - Get behavior info")
+    print("  GET  /api/robot/cognition - Get cognition config/status")
+    print("  GET  /api/robot/cognition/schema - Get cognition schema only")
+    print("  PATCH /api/robot/cognition- Update cognition config")
     print("  POST /api/robot/reset     - Reset to origin")
     print("\n🚀 Starting server on port 8000...")
     

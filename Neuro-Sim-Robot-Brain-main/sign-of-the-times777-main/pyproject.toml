@@ -41,4 +41,4 @@ hardware-serial = [
 ]
 
 [tool.setuptools]
-py-modules = ["SPINN_RobotBrain", "lorenz_kalman", "safety_layer", "hardware_abstraction"]
+py-modules = ["SPINN_RobotBrain", "lorenz_kalman", "safety_layer", "hardware_abstraction", "cognition_layer", "vendor_anthropic_adapter"]

@@ -19,6 +19,9 @@ import time
 import logging
 import os
 import uuid
+from typing import Any, Dict, Optional
+
+from cognition_layer import BaseLLMAdapter, SlowBrainCognition
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -185,7 +188,7 @@ def perennial_morphogenic(t, omega=2, n_terms=5):
 class RobotBrain:
     """SPINN-based autonomous robot control system"""
     
-    def __init__(self):
+    def __init__(self, cognition_adapter: Optional[BaseLLMAdapter] = None):
         print("🤖 Initializing Robot Brain...")
         
         # Core neural substrate
@@ -239,8 +242,54 @@ class RobotBrain:
         self.last_t0 = None
         self.last_t_action = None
         self.last_t1 = None
+
+        # Slow brain (LLM/VLM) is advisory and must never block fast safety loops.
+        if cognition_adapter is not None:
+            self.cognition = SlowBrainCognition(adapter=cognition_adapter, enabled=True)
+        else:
+            self.cognition = SlowBrainCognition.from_env()
         
         print("✓ Robot Brain online")
+
+    def _apply_cognition_directive(self, fast_decision: str, threat_avg: float) -> Dict[str, Any]:
+        """Merge slow-brain guidance with hard fast-brain safety constraints."""
+        source = 'fast_brain'
+        decision = fast_decision
+        plan = ''
+        explanation = ''
+        recovery = ''
+        memory_update = ''
+
+        directive = self.cognition.latest_directive() if self.cognition else None
+        if directive is None:
+            return {
+                'decision': decision,
+                'decision_source': source,
+                'plan': plan,
+                'explanation': explanation,
+                'recovery': recovery,
+                'memory_update': memory_update,
+            }
+
+        allowed_decisions = {'avoid_obstacle', 'explore', 'navigate_careful', 'stop'}
+        proposed = directive.decision if directive.decision in allowed_decisions else None
+
+        # Fast brain keeps authority in high threat states.
+        if threat_avg >= 0.8 and proposed in {'explore', 'navigate_careful'}:
+            proposed = None
+
+        if proposed is not None:
+            decision = proposed
+            source = directive.source
+
+        return {
+            'decision': decision,
+            'decision_source': source,
+            'plan': directive.plan,
+            'explanation': directive.explanation,
+            'recovery': directive.recovery,
+            'memory_update': directive.memory_update,
+        }
 
     def _record_fault(self, event: str, message: str, severity: str = "error", **details):
         fault = {
@@ -380,8 +429,33 @@ class RobotBrain:
                 self.morphogenic_history.append(current_phase)
             self.total_decisions += 1
         
+        # Submit non-blocking context for slow-brain cognition.
+        if self.cognition:
+            try:
+                with self._state_lock:
+                    recent_actions = list(self.action_history)[-5:]
+                self.cognition.submit({
+                    'fast_brain_decision': decision,
+                    'threat_level': float(threat_avg),
+                    'sensors': perception.get('trace_signals', [0.0, 0.0, 0.0]),
+                    'recent_actions': recent_actions,
+                    'loop_health': {
+                        'deadman_timeout_sec': self.deadman_timeout_sec,
+                        'recent_fault_count': len(self.fault_events),
+                    },
+                })
+            except Exception as e:
+                self._record_fault("cognition_submit_error", str(e), severity="warning")
+
+        cognition_result = self._apply_cognition_directive(decision, float(threat_avg))
+
         return {
-            'decision': decision,
+            'decision': cognition_result['decision'],
+            'decision_source': cognition_result['decision_source'],
+            'plan': cognition_result['plan'],
+            'explanation': cognition_result['explanation'],
+            'recovery': cognition_result['recovery'],
+            'memory_update': cognition_result['memory_update'],
             'behavior_sequence': self.current_behavior,
             'confidence': float(1.0 - threat_avg),
             'morphogenic_phase': float(np.mean(self.morphogenic_memory))
@@ -570,6 +644,8 @@ class RobotBrain:
             alive = self.brain_thread.is_alive() if self.brain_thread else False
             if not alive:
                 self.brain_thread = None
+        if self.cognition:
+            self.cognition.shutdown(timeout_sec=0.5)
         return not alive
     
     def get_status(self):
@@ -620,6 +696,7 @@ class RobotBrain:
             'deadman_timeout_sec': self.deadman_timeout_sec,
             'last_deadman_trip_ts': last_deadman_trip_ts,
             'recent_fault_count': recent_fault_count,
+            'cognition': self.cognition.status() if self.cognition else {'enabled': False},
         }
 
 # ============================================================================

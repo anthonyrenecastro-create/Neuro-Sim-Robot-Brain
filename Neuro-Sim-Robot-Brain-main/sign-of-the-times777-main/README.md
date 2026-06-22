@@ -9,6 +9,7 @@ SPINN NeuroSeer is a bio-inspired robot brain that combines:
 - **Spiking Neural Networks (SNN)** for efficient perception
 - **Lorenz-Enhanced Kalman Filtering** for robust sensor fusion
 - **Morphogenic behavior evolution** for adaptive decision making
+- **Pluggable slow-brain cognition (LLM/VLM)** for planning, language, memory, explanations, and recovery
 - **Multi-layered safety system** compliant with ISO 13482:2014
 
 ## Features
@@ -18,7 +19,15 @@ SPINN NeuroSeer is a bio-inspired robot brain that combines:
 ✅ Adaptive behavior generation via chaos dynamics  
 ✅ ISO 13482 certified safety system  
 ✅ Comprehensive error handling and recovery  
+✅ Universal LLM API adapter interface (OpenAI-compatible default + custom adapter support)  
 ✅ 20/20 tests passing with 87% coverage
+
+## Fast Brain vs Slow Brain
+
+- **Fast brain (hard real-time):** local controller, obstacle avoidance, emergency stop, stale sensor handling, velocity limits
+- **Slow brain (advisory):** LLM/VLM planning, language reasoning, memory updates, operator explanations, recovery suggestions
+
+The fast brain always has final authority in high-threat conditions.
 
 ## Safety Compliance
 
@@ -70,6 +79,8 @@ Sensors → SNN Perception → Kalman Filter → Decision Making → Motor Contr
                                           Safety Monitor
                                                 ↓
                                         Emergency Stop
+                        ↓
+                    Slow Brain (LLM/VLM, async)
 ```
 
 ## System Components
@@ -79,7 +90,95 @@ Sensors → SNN Perception → Kalman Filter → Decision Making → Motor Contr
 - `lorenz_kalman.py` - Chaos-enhanced Kalman filtering
 - `safety_layer.py` - ISO 13482 safety monitor
 - `hardware_abstraction.py` - Hardware abstraction layer and simulator adapter
+- `cognition_layer.py` - Universal slow-brain cognition layer with pluggable LLM adapters
 - `test_spinn_robot.py` - Comprehensive test suite
+
+## Universal LLM API Plug-In
+
+Default adapter is OpenAI-compatible chat completions, which works with many hosted and local OSS gateways.
+
+```bash
+# Enable slow-brain cognition
+export SPINN_COGNITION_ENABLED=true
+
+# OpenAI-compatible endpoint (hosted or local)
+export SPINN_LLM_ADAPTER=openai_compatible
+export SPINN_LLM_API_BASE=http://localhost:11434/v1
+export SPINN_LLM_API_ENDPOINT=/chat/completions
+export SPINN_LLM_MODEL=your-model-name
+export SPINN_LLM_API_KEY=optional-token
+
+# Optional HTTP auth/header customization
+export SPINN_LLM_AUTH_HEADER=Authorization
+export SPINN_LLM_AUTH_SCHEME=Bearer
+export SPINN_LLM_EXTRA_HEADERS_JSON='{"X-Tenant":"robot-lab"}'
+
+# Optional timing controls
+export SPINN_LLM_TIMEOUT_SEC=2.5
+export SPINN_COGNITION_MIN_INTERVAL_SEC=1.5
+export SPINN_COGNITION_TTL_SEC=15
+```
+
+To plug non-compatible APIs, pass a custom adapter implementing `BaseLLMAdapter` into `RobotBrain(cognition_adapter=...)`.
+
+### Concrete Non-OpenAI Template: Anthropic Messages API
+
+A ready-to-use non-OpenAI adapter is included in `vendor_anthropic_adapter.py`.
+
+```bash
+export SPINN_ANTHROPIC_API_KEY=your-key
+export SPINN_ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+export SPINN_ANTHROPIC_API_BASE=https://api.anthropic.com
+export SPINN_ANTHROPIC_ENDPOINT=/v1/messages
+export SPINN_ANTHROPIC_TIMEOUT_SEC=2.5
+export SPINN_ANTHROPIC_VERSION=2023-06-01
+```
+
+```python
+from SPINN_RobotBrain import RobotBrain
+from vendor_anthropic_adapter import anthropic_adapter_from_env
+
+adapter = anthropic_adapter_from_env()
+brain = RobotBrain(cognition_adapter=adapter)
+```
+
+Use this file as a vendor template:
+- Keep the `generate(prompt, context)` contract.
+- Map vendor request/response fields.
+- Return normalized keys: `decision`, `plan`, `explanation`, `recovery`, `memory_update`.
+
+## Runtime Cognition Config API (No Restart)
+
+Use the web API to inspect and patch slow-brain config while the process is running.
+Both `GET` and `PATCH` responses include a lightweight `schema` object listing allowed patch keys and value types for UI form generation.
+Clients that only need schema metadata can call `GET /api/robot/cognition/schema`.
+
+```bash
+# Read current cognition config + status
+curl -s http://localhost:8000/api/robot/cognition
+
+# Read schema only for dynamic UI form generation
+curl -s http://localhost:8000/api/robot/cognition/schema
+
+# Update runtime controls only
+curl -s -X PATCH http://localhost:8000/api/robot/cognition \
+   -H "Content-Type: application/json" \
+   -d '{"enabled":true,"min_interval_sec":0.5,"directive_ttl_sec":20}'
+
+# Repoint OpenAI-compatible adapter at runtime
+curl -s -X PATCH http://localhost:8000/api/robot/cognition \
+   -H "Content-Type: application/json" \
+   -d '{
+      "enabled": true,
+      "llm_api_base": "http://localhost:11434/v1",
+      "llm_api_endpoint": "/chat/completions",
+      "llm_model": "llama3.1:8b",
+      "llm_api_key": "",
+      "llm_timeout_sec": 2.5
+   }'
+```
+
+Operator tuning reference: [COGNITION_LATENCY_OPERATOR_GUIDE.md](COGNITION_LATENCY_OPERATOR_GUIDE.md)
 
 ### Performance
 - Brain loop: 956.7 Hz

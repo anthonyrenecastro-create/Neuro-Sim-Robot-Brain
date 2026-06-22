@@ -12,6 +12,8 @@ from safety_layer import (SafetyMonitor, SafetyConstraints, FailureRecovery,
 from lorenz_kalman import (LorenzEnhancedKalmanFilter, MultiSensorFusion, 
                            SensorReading)
 from SPINN_RobotBrain import RobotBrain, RobotSimulator
+from cognition_layer import BaseLLMAdapter, SlowBrainCognition
+from vendor_anthropic_adapter import AnthropicMessagesAdapter
 from hardware_abstraction import (
     SimulatedRobotHardware,
     SerialJsonRobotHardware,
@@ -196,6 +198,94 @@ class TestRobotBrain(unittest.TestCase):
         
         # Should complete in < 100ms for 10Hz operation
         self.assertLess(elapsed, 0.1)
+
+
+class TestCognitionLayer(unittest.TestCase):
+    """Slow-brain cognition integration tests."""
+
+    class _StaticAdapter(BaseLLMAdapter):
+        def __init__(self, payload):
+            self.payload = dict(payload)
+
+        def generate(self, prompt, context):
+            self.last_prompt = prompt
+            self.last_context = context
+            return dict(self.payload)
+
+    def test_slow_brain_overrides_low_threat(self):
+        adapter = self._StaticAdapter(
+            {
+                'decision': 'navigate_careful',
+                'plan': 'Move toward free corridor.',
+                'explanation': 'Low threat permits deliberate forward progress.',
+                'recovery': 'If blocked, switch to avoid_obstacle.',
+                'memory_update': 'Preferred route has low congestion.',
+            }
+        )
+        brain = RobotBrain(cognition_adapter=adapter)
+
+        # Prime perception buffer with low-threat examples.
+        for _ in range(12):
+            perception = {
+                'threat_level': 0.2,
+                'trace_signals': [0.1, 0.1, 0.1],
+                'perception': {'confidence': 0.9, 'cluster': 3},
+            }
+            result = brain.think(perception)
+
+        deadline = time.time() + 1.5
+        while result.get('decision_source') == 'fast_brain' and time.time() < deadline:
+            result = brain.think(perception)
+            time.sleep(0.05)
+
+        self.assertEqual(result['decision'], 'navigate_careful')
+        self.assertEqual(result['decision_source'], 'slow_brain')
+        self.assertIn('Low threat', result['explanation'])
+        brain.stop()
+
+    def test_fast_brain_keeps_authority_at_high_threat(self):
+        adapter = self._StaticAdapter({'decision': 'explore', 'explanation': 'Try exploring.'})
+        brain = RobotBrain(cognition_adapter=adapter)
+
+        for _ in range(12):
+            perception = {
+                'threat_level': 0.95,
+                'trace_signals': [1.0, 1.0, 1.0],
+                'perception': {'confidence': 0.1, 'cluster': 1},
+            }
+            result = brain.think(perception)
+
+        deadline = time.time() + 1.5
+        while result.get('decision_source') == 'fast_brain' and time.time() < deadline:
+            result = brain.think(perception)
+            time.sleep(0.05)
+
+        self.assertEqual(result['decision'], 'avoid_obstacle')
+        brain.stop()
+
+    def test_cognition_disabled_by_default(self):
+        cognition = SlowBrainCognition.from_env()
+        self.assertIn('enabled', cognition.status())
+        cognition.shutdown()
+
+    def test_cognition_runtime_config_update(self):
+        adapter = self._StaticAdapter({'decision': 'navigate_careful'})
+        cognition = SlowBrainCognition(adapter=adapter, enabled=True)
+
+        updated = cognition.update_config(
+            {
+                'min_interval_sec': 0.25,
+                'directive_ttl_sec': 5.0,
+                'enabled': False,
+            }
+        )
+        self.assertAlmostEqual(updated['min_interval_sec'], 0.25, delta=1e-6)
+        self.assertAlmostEqual(updated['directive_ttl_sec'], 5.0, delta=1e-6)
+        self.assertFalse(updated['enabled'])
+
+        updated = cognition.update_config({'enabled': True})
+        self.assertTrue(updated['enabled'])
+        cognition.shutdown()
 
 
 class TestIntegration(unittest.TestCase):
@@ -438,6 +528,33 @@ class TestHardwareAbstraction(unittest.TestCase):
         self.assertEqual(adapter.get_sensors().shape, (3,))
 
 
+class TestVendorAdapterTemplates(unittest.TestCase):
+    """Concrete non-OpenAI adapter template tests."""
+
+    def test_anthropic_text_extraction(self):
+        payload = {
+            'content': [
+                {'type': 'text', 'text': '{"decision":"navigate_careful","plan":"Proceed."}'},
+            ]
+        }
+        text = AnthropicMessagesAdapter._extract_text(payload)
+        self.assertTrue(text.startswith('{'))
+        self.assertIn('navigate_careful', text)
+
+    def test_anthropic_generate_fallback_explanation(self):
+        adapter = AnthropicMessagesAdapter(api_key='k', model='m')
+
+        # Monkeypatch extractor to avoid network and validate fallback behavior.
+        original_extract = adapter._extract_text
+        try:
+            adapter._extract_text = lambda _payload: 'Narrative recovery guidance.'
+            result = {'explanation': adapter._extract_text({})}
+        finally:
+            adapter._extract_text = original_extract
+
+        self.assertEqual(result['explanation'], 'Narrative recovery guidance.')
+
+
 def run_continuous_validation():
     """Run full test suite with coverage reporting"""
     print("=" * 60)
@@ -451,9 +568,11 @@ def run_continuous_validation():
     suite.addTests(loader.loadTestsFromTestCase(TestSafetyLayer))
     suite.addTests(loader.loadTestsFromTestCase(TestKalmanFilter))
     suite.addTests(loader.loadTestsFromTestCase(TestRobotBrain))
+    suite.addTests(loader.loadTestsFromTestCase(TestCognitionLayer))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
     suite.addTests(loader.loadTestsFromTestCase(TestPerformance))
     suite.addTests(loader.loadTestsFromTestCase(TestHardwareAbstraction))
+    suite.addTests(loader.loadTestsFromTestCase(TestVendorAdapterTemplates))
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
